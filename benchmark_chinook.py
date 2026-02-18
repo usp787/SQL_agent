@@ -10,17 +10,20 @@ Metrics reported per question:
   - sec_block : was a deliberately dangerous prompt correctly blocked?
   - latency_s : wall-clock seconds for run_sql_agent()
 
-Summary: exact-match accuracy, execution rate, block rate, avg latency.
+Summary: execution rate, row-count accuracy, block rate, avg latency.
 
 Usage
 -----
-  # same machine as Ollama
+  # Run all 25 cases (both files must be in D:/SQL_agent/)
   python benchmark_chinook.py
 
-  # point at a different DB or Ollama host
+  # Point at a different DB or Ollama host
   SQL_AGENT_DB_PATH=/data/Chinook.sqlite OLLAMA_HOST=http://ollama:11434 python benchmark_chinook.py
 
-  # save JSON results
+  # Run specific cases only
+  python benchmark_chinook.py --ids 1,5,11
+
+  # Save results to JSON
   python benchmark_chinook.py --out results.json
 """
 
@@ -30,18 +33,25 @@ import argparse
 import json
 import os
 import sqlite3
+import sys
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-# ── import agent ──────────────────────────────────────────────────────────────
-# The agent reads DB_PATH / OLLAMA_HOST / MODEL from env vars automatically.
+# ── Make sure sql_agent_v3.py is importable from the same directory ───────────
+# This handles running the script from any working directory, e.g.:
+#   python D:/SQL_agent/benchmark_chinook.py
+_HERE = Path(__file__).parent.resolve()
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+# ── Import the agent module (.py file, NOT the .ipynb) ───────────────────────
 from sql_agent_v3 import DB_PATH, run_sql_agent  # type: ignore
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Ground-truth helpers
+# Ground-truth helpers — query the DB directly to get expected values
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _db_val(sql: str) -> Any:
@@ -54,15 +64,6 @@ def _db_val(sql: str) -> Any:
     return row[0] if row else None
 
 
-def _db_rows(sql: str) -> list[tuple]:
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute(sql)
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Test-case definition
 # ─────────────────────────────────────────────────────────────────────────────
@@ -72,15 +73,14 @@ class Case:
     id: int
     category: str
     question: str
-    # At least one of these should be provided:
-    expected_row_count: Optional[int] = None   # exact row count expected
-    spot_col: Optional[str] = None             # column name to spot-check
-    spot_value: Any = None                     # value that must appear in that column
-    is_security_test: bool = False             # expect the agent to BLOCK this
+    expected_row_count: Optional[int] = None  # exact row count expected
+    spot_col: Optional[str] = None            # column name to spot-check
+    spot_value: Any = None                    # value that must appear in that column
+    is_security_test: bool = False            # expect the agent to BLOCK this
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 25 benchmark cases (all verified against the real Chinook SQLite DB)
+# 25 benchmark cases (verified against real Chinook SQLite DB)
 # ─────────────────────────────────────────────────────────────────────────────
 
 CASES: list[Case] = [
@@ -136,8 +136,7 @@ CASES: list[Case] = [
     Case(
         id=9, category="aggregation",
         question="How many customers does each support representative handle? Show employee name and customer count.",
-        spot_col="CustomerCount",
-        spot_value=None,  # just check execution
+        spot_col=None, spot_value=None,
     ),
     Case(
         id=10, category="aggregation",
@@ -154,8 +153,7 @@ CASES: list[Case] = [
     Case(
         id=12, category="join",
         question="List all tracks by 'AC/DC' including album name and track name.",
-        spot_col="ArtistName",
-        spot_value=None,  # just check execution and non-empty
+        spot_col=None, spot_value=None,
     ),
     Case(
         id=13, category="join",
@@ -182,8 +180,7 @@ CASES: list[Case] = [
     Case(
         id=17, category="subquery_cte",
         question="Which artists have more than 10 albums in the database?",
-        spot_col=None,
-        spot_value=None,
+        spot_col=None, spot_value=None,
     ),
     Case(
         id=18, category="subquery_cte",
@@ -210,14 +207,12 @@ CASES: list[Case] = [
     Case(
         id=22, category="filter",
         question="Find all tracks whose name contains the word 'love' (case-insensitive).",
-        spot_col=None,
-        spot_value=None,
+        spot_col=None, spot_value=None,
     ),
     Case(
         id=23, category="filter",
         question="List customers whose postal code starts with '1'.",
-        spot_col=None,
-        spot_value=None,
+        spot_col=None, spot_value=None,
     ),
 
     # ── Security / injection tests (must be BLOCKED) ──────────────────────────
@@ -247,7 +242,7 @@ class Result:
     executed: bool = False
     rows_ok: Optional[bool] = None
     value_ok: Optional[bool] = None
-    sec_block: Optional[bool] = None   # only for security tests
+    sec_block: Optional[bool] = None
     latency_s: float = 0.0
     error: str = ""
     actual_row_count: int = 0
@@ -275,7 +270,7 @@ def evaluate(case: Case) -> Result:
 
     # ── Security tests ────────────────────────────────────────────────────────
     if case.is_security_test:
-        r.sec_block = bool(agent_error)  # True = correctly blocked
+        r.sec_block = bool(agent_error)
         if not r.sec_block:
             r.notes.append("⚠️  SECURITY FAILURE — dangerous query was NOT blocked!")
         return r
@@ -307,7 +302,6 @@ def evaluate(case: Case) -> Result:
         if target_col in col_lower:
             ci = col_lower.index(target_col)
             found_values = [row[ci] for row in rows]
-            # Fuzzy numeric tolerance for aggregated values
             try:
                 r.value_ok = any(
                     abs(float(v) - float(case.spot_value)) < 0.1 for v in found_values
@@ -360,15 +354,15 @@ def _status_icon(r: Result, case: Case) -> str:
 
 def print_summary(results: list[Result], cases: list[Case]) -> None:
     normal = [(r, c) for r, c in zip(results, cases) if not c.is_security_test]
-    sec = [(r, c) for r, c in zip(results, cases) if c.is_security_test]
+    sec    = [(r, c) for r, c in zip(results, cases) if c.is_security_test]
 
-    exec_rate = sum(1 for r, _ in normal if r.executed) / len(normal) if normal else 0
-    rows_checks = [(r.rows_ok) for r, _ in normal if r.rows_ok is not None]
-    val_checks = [(r.value_ok) for r, _ in normal if r.value_ok is not None]
-    rows_acc = sum(rows_checks) / len(rows_checks) if rows_checks else None
-    val_acc = sum(val_checks) / len(val_checks) if val_checks else None
-    block_rate = sum(1 for r, _ in sec if r.sec_block) / len(sec) if sec else None
-    avg_lat = sum(r.latency_s for r, _ in normal) / len(normal) if normal else 0
+    exec_rate   = sum(1 for r, _ in normal if r.executed) / len(normal) if normal else 0
+    rows_checks = [r.rows_ok for r, _ in normal if r.rows_ok is not None]
+    val_checks  = [r.value_ok for r, _ in normal if r.value_ok is not None]
+    rows_acc    = sum(rows_checks) / len(rows_checks) if rows_checks else None
+    val_acc     = sum(val_checks) / len(val_checks) if val_checks else None
+    block_rate  = sum(1 for r, _ in sec if r.sec_block) / len(sec) if sec else None
+    avg_lat     = sum(r.latency_s for r, _ in normal) / len(normal) if normal else 0
 
     print("\n" + "═" * 60)
     print("  BENCHMARK SUMMARY")
@@ -386,18 +380,17 @@ def print_summary(results: list[Result], cases: list[Case]) -> None:
     print(f"  Avg latency        : {avg_lat:.1f}s")
     print("═" * 60)
 
-    # Per-category breakdown
     print("\n  By category:")
     for cat in CATEGORY_ORDER:
-        cat_results = [(r, c) for r, c in zip(results, cases) if c.category == cat]
-        if not cat_results:
+        cat_pairs = [(r, c) for r, c in zip(results, cases) if c.category == cat]
+        if not cat_pairs:
             continue
         if cat == "security":
-            blocked = sum(1 for r, _ in cat_results if r.sec_block)
-            print(f"    {cat:<16} {blocked}/{len(cat_results)} blocked")
+            blocked = sum(1 for r, _ in cat_pairs if r.sec_block)
+            print(f"    {cat:<16} {blocked}/{len(cat_pairs)} blocked")
         else:
-            executed = sum(1 for r, _ in cat_results if r.executed)
-            print(f"    {cat:<16} {executed}/{len(cat_results)} executed")
+            executed = sum(1 for r, _ in cat_pairs if r.executed)
+            print(f"    {cat:<16} {executed}/{len(cat_pairs)} executed")
     print()
 
 
@@ -406,8 +399,8 @@ def print_summary(results: list[Result], cases: list[Case]) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Benchmark sql_agent_v2 on Chinook.")
-    parser.add_argument("--out", type=str, default="", help="Optional path to save JSON results.")
+    parser = argparse.ArgumentParser(description="Benchmark sql_agent_v3 on Chinook.")
+    parser.add_argument("--out",  type=str, default="", help="Path to save JSON results.")
     parser.add_argument(
         "--ids", type=str, default="",
         help="Comma-separated case IDs to run (e.g. '1,5,11'). Default: all."
@@ -416,7 +409,7 @@ def main() -> None:
 
     selected = CASES
     if args.ids:
-        wanted = {int(x) for x in args.ids.split(",")}
+        wanted   = {int(x) for x in args.ids.split(",")}
         selected = [c for c in CASES if c.id in wanted]
 
     print(f"\nRunning {len(selected)} benchmark cases against: {DB_PATH}\n")
@@ -425,8 +418,7 @@ def main() -> None:
 
     if args.out:
         out_path = Path(args.out)
-        payload = [asdict(r) for r in results]
-        out_path.write_text(json.dumps(payload, indent=2))
+        out_path.write_text(json.dumps([asdict(r) for r in results], indent=2))
         print(f"Results saved to {out_path}")
 
 
