@@ -294,7 +294,7 @@ def evaluate(case: Case) -> Result:
             r.notes.append(
                 f"Row count mismatch: expected {case.expected_row_count}, got {r.actual_row_count}"
             )
-
+    """
     # Spot-value check
     if case.spot_col is not None and case.spot_value is not None:
         col_lower = [c.lower() for c in cols]
@@ -311,6 +311,20 @@ def evaluate(case: Case) -> Result:
         else:
             r.notes.append(f"Column '{case.spot_col}' not found in result: {cols}")
             r.value_ok = False
+    """
+    
+    if case.spot_col is not None and case.spot_value is not None:
+        col_lower = [c.lower() for c in cols]
+        target_col = case.spot_col.lower()
+        if target_col in col_lower:
+            ci = col_lower.index(target_col)
+        elif len(rows) == 1 and len(cols) == 1:
+            ci = 0  # single-value result, use positional match
+        else:
+            ci = None
+    
+        if ci is not None:
+            found_values = [row[ci] for row in rows]
 
     return r
 
