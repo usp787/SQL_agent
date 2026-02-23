@@ -38,7 +38,7 @@ from langgraph.graph import END, START, StateGraph
 
 DB_PATH: str = os.environ.get(
     "SQL_AGENT_DB_PATH",
-    "D:/SQL_agent/Chinook_Sqlite.sqlite",   # local Windows fallback
+    str(Path(__file__).parent / "Chinook_Sqlite.sqlite"),
 )
 
 CHROMA_DIR: str = os.environ.get(
