@@ -24,7 +24,7 @@ Supported and evaluated models include:
 ## 📂 Repository Structure
 
 * `qwen_local/` - Configurations and scripts for local Qwen model deployment.
-* `sql_agent.ipynb` & `sql_agent_v2.ipynb` - Core implementation notebooks detailing the agent's logic and iterative improvements.
+* `sql_agent_v3.py` - Core implementation notebooks detailing the agent's logic and iterative improvements.
 * `ollama_test.ipynb` - Sandbox environment for testing local Ollama endpoints and evaluating model responses.
 * `Chinook_Sqlite.sqlite` & `sql_agent_database.db` - Sample relational databases utilized for querying, testing, and validation.
 
@@ -34,7 +34,7 @@ To explore the agent, ensure you have a local instance of Ollama running.
 
 1. Clone the repository to your local machine.
 2. Ensure you have the required models pulled via Ollama (e.g., `ollama run qwen` or `ollama run deepseek`).
-3. Open and execute the cells within `sql_agent_v2.ipynb` to initialize the agent and begin querying the included SQLite databases. 
+3. Open and execute the cells within `sql_agent_v3.py` to initialize the agent and begin querying the included SQLite databases. 
 
 *(Note: Exhaustive test steps and environment setups are omitted here for brevity. Please refer to the inline documentation within the Jupyter notebooks for specific execution flows.)*
 
