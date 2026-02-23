@@ -1,0 +1,115 @@
+{
+  "total_cases": 101,
+  "success_cases": 93,
+  "blocked_cases": 5,
+  "graceful_error_cases": 3,
+  "overall_pass_rate": 0.1782,
+  "exec_success_rate": 0.9208,
+  "exact_result_accuracy": 0.1075,
+  "average_retries": 0.1089,
+  "avg_latency_s": 2.2422,
+  "blocked_case_pass_rate": 1.0,
+  "graceful_error_pass_rate": 1.0,
+  "top_failure_reasons": [
+    {
+      "reason": "result_mismatch_or_success",
+      "count": 83
+    }
+  ],
+  "by_tier": {
+    "A": {
+      "total": 25,
+      "pass_rate": 0.2,
+      "exec_success_rate": 1.0
+    },
+    "B": {
+      "total": 35,
+      "pass_rate": 0.1143,
+      "exec_success_rate": 1.0
+    },
+    "C": {
+      "total": 25,
+      "pass_rate": 0.04,
+      "exec_success_rate": 1.0
+    },
+    "D": {
+      "total": 16,
+      "pass_rate": 0.5,
+      "exec_success_rate": 0.5
+    }
+  },
+  "by_category": {
+    "aggregate": {
+      "total": 10,
+      "pass_rate": 0.0
+    },
+    "ambiguous": {
+      "total": 3,
+      "pass_rate": 0.0
+    },
+    "column_mismatch": {
+      "total": 2,
+      "pass_rate": 0.0
+    },
+    "dangerous_wording": {
+      "total": 3,
+      "pass_rate": 1.0
+    },
+    "date_filter": {
+      "total": 3,
+      "pass_rate": 0.0
+    },
+    "distinct": {
+      "total": 5,
+      "pass_rate": 0.6
+    },
+    "for_each_x_find_y": {
+      "total": 9,
+      "pass_rate": 0.0
+    },
+    "groupby_having": {
+      "total": 8,
+      "pass_rate": 0.0
+    },
+    "join": {
+      "total": 15,
+      "pass_rate": 0.0667
+    },
+    "multi_condition": {
+      "total": 4,
+      "pass_rate": 0.0
+    },
+    "multi_hop_join": {
+      "total": 3,
+      "pass_rate": 0.0
+    },
+    "nested_subquery": {
+      "total": 10,
+      "pass_rate": 0.1
+    },
+    "nonexistent": {
+      "total": 3,
+      "pass_rate": 1.0
+    },
+    "ratio_percent": {
+      "total": 3,
+      "pass_rate": 0.0
+    },
+    "security": {
+      "total": 2,
+      "pass_rate": 1.0
+    },
+    "single_table": {
+      "total": 10,
+      "pass_rate": 0.5
+    },
+    "synonym": {
+      "total": 3,
+      "pass_rate": 0.0
+    },
+    "topk": {
+      "total": 5,
+      "pass_rate": 0.0
+    }
+  }
+}

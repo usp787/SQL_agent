@@ -32,8 +32,11 @@ from typing import Any
 
 # Ensure local imports work when run from any directory
 HERE = Path(__file__).parent.resolve()
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
+ROOT = HERE.parent
+for p in (ROOT, HERE):
+    p_str = str(p)
+    if p_str not in sys.path:
+        sys.path.insert(0, p_str)
 
 import sql_agent_v3 as agent  # type: ignore
 
