@@ -41,8 +41,10 @@ from typing import Any
 
 # ── Ensure sql_agent_v3 is importable ────────────────────────────────────────
 _HERE = Path(__file__).parent.resolve()
-if str(_HERE) not in sys.path:
-    sys.path.insert(0, str(_HERE))
+_PROJECT_ROOT = _HERE.parent
+for _p in (str(_PROJECT_ROOT), str(_HERE)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from sql_agent_v3 import DB_PATH, MODEL_NAME, MAX_TRIES, run_sql_agent  # type: ignore
 
@@ -50,7 +52,11 @@ from sql_agent_v3 import DB_PATH, MODEL_NAME, MAX_TRIES, run_sql_agent  # type: 
 # Load benchmark questions
 # ─────────────────────────────────────────────────────────────────────────────
 
-BENCHMARK_FILE = _HERE / "chinook_benchmark_v2.json"
+_BENCHMARK_CANDIDATES = (
+    _HERE / "chinook_benchmark_v2.json",
+    _HERE / "chinook-benchmark-json.json",
+)
+BENCHMARK_FILE = next((p for p in _BENCHMARK_CANDIDATES if p.exists()), _BENCHMARK_CANDIDATES[0])
 
 
 def load_cases(path: Path) -> list[dict]:
@@ -370,7 +376,7 @@ def main():
               f"{case['question'][:55]}...")
         r = evaluate_case(case)
 
-        icon = "✅" if r["passed"] else ("🔒" if r["blocked"] else "❌")
+        icon = "PASS" if r["passed"] else ("BLOCK" if r["blocked"] else "FAIL")
         extra = f" | {r['failure_reason']}" if r["failure_reason"] and not r["passed"] else ""
         print(f"        {icon} {r['latency_s']:.1f}s retries={r['retries']}{extra}")
         results.append(r)
