@@ -167,16 +167,23 @@ Hard constraints:
 - Output ONLY the SQL query — no markdown fences, no explanation.
 - ONLY use tables and columns that exist in the schema below. Never invent or assume tables/columns not listed.
 
+
+
+
 Column selection rules:
-- Always include the primary key column(s) of the main table(s) in your SELECT list.
-  For example: if querying Track, always include TrackId; if querying Customer, always include CustomerId.
-- When the question asks to "list" or "show" items, include identifying columns (IDs, names) alongside the requested data.
-- When joining tables, include the key columns that establish the relationship so results are traceable.
-- For aggregation queries (COUNT, SUM, AVG, etc.), use a descriptive alias for the result column.
-  For example: COUNT(*) AS track_count, SUM(Total) AS total_revenue, AVG(UnitPrice) AS avg_price.
+- Select ONLY the columns the question asks for. Do NOT add extra columns (like IDs) unless the question explicitly mentions them.
+  For example: "List all artist names" → SELECT Name FROM Artist (do NOT add ArtistId).
+  For example: "Show invoice IDs and totals" → SELECT InvoiceId, Total FROM Invoice (IDs were requested).
+- For aggregation queries (COUNT, SUM, AVG, etc.), use a descriptive alias that matches the question's wording.
+  For example: "How many customers?" → COUNT(*) AS cnt
+  For example: "What is the total revenue?" → SUM(Total) AS TotalRevenue
+- ALWAYS wrap numeric aggregations (AVG, SUM used for averages/ratios, division results) with ROUND(..., 2) unless the question specifies otherwise.
+  For example: AVG(Total) → ROUND(AVG(Total), 2)
+  For example: SUM(Total) / COUNT(*) → ROUND(SUM(Total) / COUNT(*), 2)
+  Exception: COUNT, MIN, MAX of integers, and plain SUM of currency totals do not need ROUND.
 - When the question mentions "ordered by" a column, include that column in the SELECT list.
 - For GROUP BY queries, include all grouping columns in the SELECT list.
-- ROUND numeric aggregations to 2 decimal places unless the question specifies otherwise.
+
 
 Table selection rules:
 - Use ONLY the Chinook database tables: Album, Artist, Customer, Employee, Genre, Invoice, InvoiceLine, MediaType, Playlist, PlaylistTrack, Track.
@@ -204,8 +211,19 @@ Full schema (fallback reference):
     sql = response["message"]["content"].strip()
     sql = sql.replace("```sql", "").replace("```", "").strip()
     return sql
-
-
+"""
+Older column selection rules
+Column selection rules:
+- Always include the primary key column(s) of the main table(s) in your SELECT list.
+  For example: if querying Track, always include TrackId; if querying Customer, always include CustomerId.
+- When the question asks to "list" or "show" items, include identifying columns (IDs, names) alongside the requested data.
+- When joining tables, include the key columns that establish the relationship so results are traceable.
+- For aggregation queries (COUNT, SUM, AVG, etc.), use a descriptive alias for the result column.
+  For example: COUNT(*) AS track_count, SUM(Total) AS total_revenue, AVG(UnitPrice) AS avg_price.
+- When the question mentions "ordered by" a column, include that column in the SELECT list.
+- For GROUP BY queries, include all grouping columns in the SELECT list.
+- ROUND numeric aggregations to 2 decimal places unless the question specifies otherwise.
+"""
 # ─────────────────────────────────────────────────────────────────────────────
 # SQL execution (read-only connection)
 # ─────────────────────────────────────────────────────────────────────────────
