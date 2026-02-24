@@ -130,6 +130,32 @@ def get_database_schema(db_path: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # SQL generation
 # ─────────────────────────────────────────────────────────────────────────────
+"""
+def generate_sql(question: str, schema: str, rag_context: str = "") -> str:
+    system_prompt = fYou are an expert SQLite SQL assistant.
+
+Hard constraints:
+- Produce a SINGLE read-only query: SELECT (optionally WITH / EXPLAIN).
+- DO NOT use INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/PRAGMA/ATTACH/DETACH/VACUUM.
+- Output ONLY the SQL query — no markdown fences, no explanation.
+
+Relevant schema context (retrieved):
+{rag_context}
+
+Full schema (fallback reference):
+{schema}
+
+    response = _ollama_client.chat(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question},
+        ],
+    )
+    sql = response["message"]["content"].strip()
+    sql = sql.replace("```sql", "").replace("```", "").strip()
+    return sql
+"""
 
 def generate_sql(question: str, schema: str, rag_context: str = "") -> str:
     system_prompt = f"""You are an expert SQLite SQL assistant.
@@ -138,6 +164,28 @@ Hard constraints:
 - Produce a SINGLE read-only query: SELECT (optionally WITH / EXPLAIN).
 - DO NOT use INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/PRAGMA/ATTACH/DETACH/VACUUM.
 - Output ONLY the SQL query — no markdown fences, no explanation.
+- ONLY use tables and columns that exist in the schema below. Never invent or assume tables/columns not listed.
+
+Column selection rules:
+- Always include the primary key column(s) of the main table(s) in your SELECT list.
+  For example: if querying Track, always include TrackId; if querying Customer, always include CustomerId.
+- When the question asks to "list" or "show" items, include identifying columns (IDs, names) alongside the requested data.
+- When joining tables, include the key columns that establish the relationship so results are traceable.
+- For aggregation queries (COUNT, SUM, AVG, etc.), use a descriptive alias for the result column.
+  For example: COUNT(*) AS track_count, SUM(Total) AS total_revenue, AVG(UnitPrice) AS avg_price.
+- When the question mentions "ordered by" a column, include that column in the SELECT list.
+- For GROUP BY queries, include all grouping columns in the SELECT list.
+- ROUND numeric aggregations to 2 decimal places unless the question specifies otherwise.
+
+Table selection rules:
+- Use ONLY the Chinook database tables: Album, Artist, Customer, Employee, Genre, Invoice, InvoiceLine, MediaType, Playlist, PlaylistTrack, Track.
+- "customers", "buyers", "clients" → Customer table
+- "invoices", "orders", "purchases", "sales", "transactions" → Invoice / InvoiceLine tables
+- "songs", "tunes", "tracks" → Track table
+- "albums", "records", "releases" → Album table
+- "artists", "bands", "performers" → Artist table
+- "employees", "staff", "reps" → Employee table
+- Do NOT use any other tables even if they appear in the schema.
 
 Relevant schema context (retrieved):
 {rag_context}
@@ -155,7 +203,6 @@ Full schema (fallback reference):
     sql = response["message"]["content"].strip()
     sql = sql.replace("```sql", "").replace("```", "").strip()
     return sql
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SQL execution (read-only connection)
