@@ -325,6 +325,14 @@ def save_summary(summary: dict, path: str):
         json.dump(summary, f, indent=2, ensure_ascii=False)
     print(f"  Summary saved to {path}")
 
+def _resolve_out(path_str: str | None) -> str | None:
+    if not path_str:
+        return None
+    p = Path(path_str)
+    if not p.is_absolute():
+        p = _HERE / p
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return str(p)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
@@ -344,6 +352,9 @@ def main():
     parser.add_argument("--out-csv", default=None, help="Output CSV file path")
     parser.add_argument("--out-summary", default=None, help="Output summary JSON path")
     args = parser.parse_args()
+    args.out_jsonl = _resolve_out(args.out_jsonl)
+    args.out_csv = _resolve_out(args.out_csv)
+    args.out_summary = _resolve_out(args.out_summary)
 
     # Load
     cases = load_cases(Path(args.benchmark))
