@@ -83,7 +83,7 @@ def schema_to_docs(schema_text: str) -> list[dict]:
 
 
 def build_or_load_chroma(
-    schema_text: str, force_rebuild: bool = True
+    schema_text: str, force_rebuild: bool = False #easier for large deployments to control when the index is built, rather than always building at startup
 ) -> chromadb.Collection:
     client = chromadb.PersistentClient(path=CHROMA_DIR)
     if force_rebuild:
@@ -281,7 +281,9 @@ def node_generate_sql(state: SQLState) -> SQLState:
 
 def node_security_check(state: SQLState) -> SQLState:
     """Flags disallowed keywords. route_after_security will short-circuit to END."""
-    if BLOCKED.search(state["sql"]) or BLOCKED.search(state["question"]):
+    
+    #if BLOCKED.search(state["sql"]) or BLOCKED.search(state["question"]): still allow blocked keywords in the question, just not the generated SQL
+    if BLOCKED.search(state["sql"]):
         state["error"] = "Blocked: query contains a disallowed keyword."
         state["result"] = None
     return state
