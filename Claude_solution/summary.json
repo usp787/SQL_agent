@@ -3,17 +3,17 @@
   "max_retries": 2,
   "db_path": "D:\\SQL_agent\\Chinook_Sqlite.sqlite",
   "total_cases": 100,
-  "passed": 59,
-  "pass_rate": 59.0,
-  "exec_success_rate": 101.05,
+  "passed": 62,
+  "pass_rate": 62.0,
+  "exec_success_rate": 100.0,
   "security_block_rate": 100.0,
   "avg_retries": 0.11,
-  "avg_latency_s": 2.28,
+  "avg_latency_s": 2.31,
   "tier_stats": {
     "A": {
       "total": 25,
-      "passed": 22,
-      "rate": 0.88
+      "passed": 20,
+      "rate": 0.8
     },
     "B": {
       "total": 35,
@@ -22,20 +22,20 @@
     },
     "C": {
       "total": 25,
-      "passed": 11,
-      "rate": 0.44
+      "passed": 14,
+      "rate": 0.56
     },
     "D": {
       "total": 15,
-      "passed": 7,
-      "rate": 0.4666666666666667
+      "passed": 9,
+      "rate": 0.6
     }
   },
   "category_stats": {
     "aggregation": {
       "total": 7,
-      "passed": 6,
-      "rate": 0.8571428571428571
+      "passed": 7,
+      "rate": 1.0
     },
     "ambiguous": {
       "total": 3,
@@ -44,8 +44,8 @@
     },
     "cte": {
       "total": 4,
-      "passed": 3,
-      "rate": 0.75
+      "passed": 4,
+      "rate": 1.0
     },
     "date": {
       "total": 4,
@@ -54,8 +54,8 @@
     },
     "filter": {
       "total": 4,
-      "passed": 1,
-      "rate": 0.25
+      "passed": 0,
+      "rate": 0.0
     },
     "having": {
       "total": 5,
@@ -64,18 +64,18 @@
     },
     "join": {
       "total": 22,
-      "passed": 15,
-      "rate": 0.6818181818181818
+      "passed": 16,
+      "rate": 0.7272727272727273
     },
     "multi_hop": {
       "total": 7,
-      "passed": 6,
-      "rate": 0.8571428571428571
+      "passed": 4,
+      "rate": 0.5714285714285714
     },
     "nonexistent": {
       "total": 2,
-      "passed": 1,
-      "rate": 0.5
+      "passed": 0,
+      "rate": 0.0
     },
     "security": {
       "total": 3,
@@ -89,30 +89,30 @@
     },
     "single_table": {
       "total": 18,
-      "passed": 16,
-      "rate": 0.8888888888888888
+      "passed": 13,
+      "rate": 0.7222222222222222
     },
     "subquery": {
       "total": 14,
-      "passed": 2,
-      "rate": 0.14285714285714285
+      "passed": 6,
+      "rate": 0.42857142857142855
     },
     "synonym": {
       "total": 5,
-      "passed": 0,
-      "rate": 0.0
+      "passed": 3,
+      "rate": 0.6
     }
   },
   "top_failure_reasons": {
-    "value_mismatch": 30,
-    "row_count_0_vs_1": 2,
+    "value_mismatch": 24,
+    "exec_error": 2,
     "row_count_1_vs_10": 2,
+    "should_have_failed_gracefully": 2,
+    "row_count_18_vs_14": 1,
+    "row_count_1297_vs_1213": 1,
     "row_count_8_vs_3": 1,
-    "row_count_0_vs_14": 1,
-    "row_count_0_vs_8": 1,
-    "row_count_59_vs_0": 1,
-    "row_count_0_vs_5": 1,
-    "row_count_0_vs_10": 1,
-    "should_have_failed_gracefully": 1
+    "row_count_114_vs_104": 1,
+    "row_count_213_vs_208": 1,
+    "row_count_25_vs_1": 1
   }
 }

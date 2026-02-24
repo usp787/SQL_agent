@@ -21,10 +21,10 @@ Eval modes:
   expect_graceful_fail — agent should fail gracefully (nonexistent field)
 
 Usage:
-  C:/Users/usp78/AppData/Local/Programs/Python/Python311/python.exe d:/SQL_agent/Claude_solution/benchmark_chinook_v2.py --out-csv results.csv --out-jsonl results.jsonl --out-summary summary.json
-  python benchmark_chinook_v2.py --tier A --tier B
-  python benchmark_chinook_v2.py --ids C01,C02,D11
-  python benchmark_chinook_v2.py --out-csv results.csv --out-jsonl results.jsonl --out-summary summary.json
+  C:/Users/usp78/AppData/Local/Programs/Python/Python311/python.exe d:/SQL_agent/Claude_solution/benchmark_chinook_strict.py --out-csv results.csv --out-jsonl results.jsonl --out-summary summary.json
+  python benchmark_chinook_strict.py --tier A --tier B
+  python benchmark_chinook_strict.py --ids C01,C02,D11
+  python benchmark_chinook_strict.py --out-csv results.csv --out-jsonl results.jsonl --out-summary summary.json
 """
 
 from __future__ import annotations
