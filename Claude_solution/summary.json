@@ -6,14 +6,14 @@
   "passed": 62,
   "pass_rate": 62.0,
   "exec_success_rate": 100.0,
-  "security_block_rate": 100.0,
-  "avg_retries": 0.11,
-  "avg_latency_s": 2.31,
+  "security_block_rate": 33.33,
+  "avg_retries": 0.08,
+  "avg_latency_s": 2.27,
   "tier_stats": {
     "A": {
       "total": 25,
-      "passed": 20,
-      "rate": 0.8
+      "passed": 23,
+      "rate": 0.92
     },
     "B": {
       "total": 35,
@@ -22,13 +22,13 @@
     },
     "C": {
       "total": 25,
-      "passed": 14,
-      "rate": 0.56
+      "passed": 12,
+      "rate": 0.48
     },
     "D": {
       "total": 15,
-      "passed": 9,
-      "rate": 0.6
+      "passed": 8,
+      "rate": 0.5333333333333333
     }
   },
   "category_stats": {
@@ -44,8 +44,8 @@
     },
     "cte": {
       "total": 4,
-      "passed": 4,
-      "rate": 1.0
+      "passed": 2,
+      "rate": 0.5
     },
     "date": {
       "total": 4,
@@ -54,23 +54,23 @@
     },
     "filter": {
       "total": 4,
-      "passed": 0,
-      "rate": 0.0
+      "passed": 1,
+      "rate": 0.25
     },
     "having": {
       "total": 5,
-      "passed": 1,
-      "rate": 0.2
+      "passed": 2,
+      "rate": 0.4
     },
     "join": {
       "total": 22,
-      "passed": 16,
-      "rate": 0.7272727272727273
+      "passed": 14,
+      "rate": 0.6363636363636364
     },
     "multi_hop": {
       "total": 7,
-      "passed": 4,
-      "rate": 0.5714285714285714
+      "passed": 6,
+      "rate": 0.8571428571428571
     },
     "nonexistent": {
       "total": 2,
@@ -79,8 +79,8 @@
     },
     "security": {
       "total": 3,
-      "passed": 3,
-      "rate": 1.0
+      "passed": 1,
+      "rate": 0.3333333333333333
     },
     "security_false_positive": {
       "total": 2,
@@ -89,30 +89,29 @@
     },
     "single_table": {
       "total": 18,
-      "passed": 13,
-      "rate": 0.7222222222222222
+      "passed": 16,
+      "rate": 0.8888888888888888
     },
     "subquery": {
       "total": 14,
-      "passed": 6,
-      "rate": 0.42857142857142855
+      "passed": 4,
+      "rate": 0.2857142857142857
     },
     "synonym": {
       "total": 5,
-      "passed": 3,
-      "rate": 0.6
+      "passed": 4,
+      "rate": 0.8
     }
   },
   "top_failure_reasons": {
-    "value_mismatch": 24,
+    "value_mismatch": 26,
     "exec_error": 2,
     "row_count_1_vs_10": 2,
     "should_have_failed_gracefully": 2,
-    "row_count_18_vs_14": 1,
-    "row_count_1297_vs_1213": 1,
+    "security_not_blocked": 2,
     "row_count_8_vs_3": 1,
-    "row_count_114_vs_104": 1,
-    "row_count_213_vs_208": 1,
-    "row_count_25_vs_1": 1
+    "row_count_320_vs_253": 1,
+    "row_count_354_vs_5": 1,
+    "row_count_59_vs_22": 1
   }
 }

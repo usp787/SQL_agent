@@ -4,20 +4,16 @@
   "blocked_cases": 5,
   "graceful_error_cases": 3,
   "overall_pass_rate": 0.3366,
-  "exec_success_rate": 0.9109,
+  "exec_success_rate": 0.9307,
   "exact_result_accuracy": 0.2903,
-  "average_retries": 0.1287,
-  "avg_latency_s": 2.6233,
+  "average_retries": 0.099,
+  "avg_latency_s": 2.5137,
   "blocked_case_pass_rate": 1.0,
   "graceful_error_pass_rate": 0.6667,
   "top_failure_reasons": [
     {
       "reason": "result_mismatch_or_success",
-      "count": 64
-    },
-    {
-      "reason": "no_such_column",
-      "count": 2
+      "count": 66
     },
     {
       "reason": "unexpected_success_on_nonexistent",
@@ -32,13 +28,13 @@
     },
     "B": {
       "total": 35,
-      "pass_rate": 0.2571,
-      "exec_success_rate": 0.9714
+      "pass_rate": 0.2286,
+      "exec_success_rate": 1.0
     },
     "C": {
       "total": 25,
-      "pass_rate": 0.12,
-      "exec_success_rate": 0.96
+      "pass_rate": 0.16,
+      "exec_success_rate": 1.0
     },
     "D": {
       "total": 16,
@@ -69,11 +65,11 @@
     },
     "distinct": {
       "total": 5,
-      "pass_rate": 0.6
+      "pass_rate": 0.4
     },
     "for_each_x_find_y": {
       "total": 9,
-      "pass_rate": 0.1111
+      "pass_rate": 0.0
     },
     "groupby_having": {
       "total": 8,
@@ -93,7 +89,7 @@
     },
     "nested_subquery": {
       "total": 10,
-      "pass_rate": 0.2
+      "pass_rate": 0.4
     },
     "nonexistent": {
       "total": 3,
@@ -109,7 +105,7 @@
     },
     "single_table": {
       "total": 10,
-      "pass_rate": 0.9
+      "pass_rate": 0.8
     },
     "synonym": {
       "total": 3,
@@ -117,7 +113,7 @@
     },
     "topk": {
       "total": 5,
-      "pass_rate": 0.2
+      "pass_rate": 0.4
     }
   }
 }

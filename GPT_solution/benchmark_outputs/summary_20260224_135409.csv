@@ -1,2 +1,0 @@
-total_cases,success_cases,blocked_cases,graceful_error_cases,overall_pass_rate,exec_success_rate,exact_result_accuracy,average_retries,avg_latency_s,blocked_case_pass_rate,graceful_error_pass_rate,top_failure_reasons
-101,93,5,3,0.3366,0.9109,0.2903,0.1287,2.6233,1.0,0.6667,"[{""reason"": ""result_mismatch_or_success"", ""count"": 64}, {""reason"": ""no_such_column"", ""count"": 2}, {""reason"": ""unexpected_success_on_nonexistent"", ""count"": 1}]"
