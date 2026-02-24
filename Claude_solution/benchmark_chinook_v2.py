@@ -21,7 +21,7 @@ Eval modes:
   expect_graceful_fail — agent should fail gracefully (nonexistent field)
 
 Usage:
-  python benchmark_chinook_v2.py
+  C:/Users/usp78/AppData/Local/Programs/Python/Python311/python.exe d:/SQL_agent/Claude_solution/benchmark_chinook_v2.py --out-csv results.csv --out-jsonl results.jsonl --out-summary summary.json
   python benchmark_chinook_v2.py --tier A --tier B
   python benchmark_chinook_v2.py --ids C01,C02,D11
   python benchmark_chinook_v2.py --out-csv results.csv --out-jsonl results.jsonl --out-summary summary.json
@@ -41,10 +41,11 @@ from typing import Any
 
 # ── Ensure sql_agent_v3 is importable ────────────────────────────────────────
 _HERE = Path(__file__).parent.resolve()
-_PROJECT_ROOT = _HERE.parent
-for _p in (str(_PROJECT_ROOT), str(_HERE)):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+_ROOT = _HERE.parent
+for _p in (_ROOT, _HERE):
+    _p_str = str(_p)
+    if _p_str not in sys.path:
+        sys.path.insert(0, _p_str)
 
 from sql_agent_v3 import DB_PATH, MODEL_NAME, MAX_TRIES, run_sql_agent  # type: ignore
 
@@ -52,11 +53,7 @@ from sql_agent_v3 import DB_PATH, MODEL_NAME, MAX_TRIES, run_sql_agent  # type: 
 # Load benchmark questions
 # ─────────────────────────────────────────────────────────────────────────────
 
-_BENCHMARK_CANDIDATES = (
-    _HERE / "chinook_benchmark_v2.json",
-    _HERE / "chinook-benchmark-json.json",
-)
-BENCHMARK_FILE = next((p for p in _BENCHMARK_CANDIDATES if p.exists()), _BENCHMARK_CANDIDATES[0])
+BENCHMARK_FILE = _HERE / "chinook_benchmark_v2.json"
 
 
 def load_cases(path: Path) -> list[dict]:
@@ -376,7 +373,7 @@ def main():
               f"{case['question'][:55]}...")
         r = evaluate_case(case)
 
-        icon = "PASS" if r["passed"] else ("BLOCK" if r["blocked"] else "FAIL")
+        icon = "✅" if r["passed"] else ("🔒" if r["blocked"] else "❌")
         extra = f" | {r['failure_reason']}" if r["failure_reason"] and not r["passed"] else ""
         print(f"        {icon} {r['latency_s']:.1f}s retries={r['retries']}{extra}")
         results.append(r)

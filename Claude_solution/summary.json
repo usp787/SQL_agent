@@ -1,0 +1,118 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "max_retries": 2,
+  "db_path": "D:\\SQL_agent\\Chinook_Sqlite.sqlite",
+  "total_cases": 100,
+  "passed": 59,
+  "pass_rate": 59.0,
+  "exec_success_rate": 101.05,
+  "security_block_rate": 100.0,
+  "avg_retries": 0.11,
+  "avg_latency_s": 2.28,
+  "tier_stats": {
+    "A": {
+      "total": 25,
+      "passed": 22,
+      "rate": 0.88
+    },
+    "B": {
+      "total": 35,
+      "passed": 19,
+      "rate": 0.5428571428571428
+    },
+    "C": {
+      "total": 25,
+      "passed": 11,
+      "rate": 0.44
+    },
+    "D": {
+      "total": 15,
+      "passed": 7,
+      "rate": 0.4666666666666667
+    }
+  },
+  "category_stats": {
+    "aggregation": {
+      "total": 7,
+      "passed": 6,
+      "rate": 0.8571428571428571
+    },
+    "ambiguous": {
+      "total": 3,
+      "passed": 2,
+      "rate": 0.6666666666666666
+    },
+    "cte": {
+      "total": 4,
+      "passed": 3,
+      "rate": 0.75
+    },
+    "date": {
+      "total": 4,
+      "passed": 2,
+      "rate": 0.5
+    },
+    "filter": {
+      "total": 4,
+      "passed": 1,
+      "rate": 0.25
+    },
+    "having": {
+      "total": 5,
+      "passed": 1,
+      "rate": 0.2
+    },
+    "join": {
+      "total": 22,
+      "passed": 15,
+      "rate": 0.6818181818181818
+    },
+    "multi_hop": {
+      "total": 7,
+      "passed": 6,
+      "rate": 0.8571428571428571
+    },
+    "nonexistent": {
+      "total": 2,
+      "passed": 1,
+      "rate": 0.5
+    },
+    "security": {
+      "total": 3,
+      "passed": 3,
+      "rate": 1.0
+    },
+    "security_false_positive": {
+      "total": 2,
+      "passed": 1,
+      "rate": 0.5
+    },
+    "single_table": {
+      "total": 18,
+      "passed": 16,
+      "rate": 0.8888888888888888
+    },
+    "subquery": {
+      "total": 14,
+      "passed": 2,
+      "rate": 0.14285714285714285
+    },
+    "synonym": {
+      "total": 5,
+      "passed": 0,
+      "rate": 0.0
+    }
+  },
+  "top_failure_reasons": {
+    "value_mismatch": 30,
+    "row_count_0_vs_1": 2,
+    "row_count_1_vs_10": 2,
+    "row_count_8_vs_3": 1,
+    "row_count_0_vs_14": 1,
+    "row_count_0_vs_8": 1,
+    "row_count_59_vs_0": 1,
+    "row_count_0_vs_5": 1,
+    "row_count_0_vs_10": 1,
+    "should_have_failed_gracefully": 1
+  }
+}
