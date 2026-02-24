@@ -83,7 +83,7 @@ def schema_to_docs(schema_text: str) -> list[dict]:
 
 
 def build_or_load_chroma(
-    schema_text: str, force_rebuild: bool = False
+    schema_text: str, force_rebuild: bool = True
 ) -> chromadb.Collection:
     client = chromadb.PersistentClient(path=CHROMA_DIR)
     if force_rebuild:
