@@ -3,45 +3,53 @@
   "success_cases": 93,
   "blocked_cases": 5,
   "graceful_error_cases": 3,
-  "overall_pass_rate": 0.1782,
-  "exec_success_rate": 0.9208,
-  "exact_result_accuracy": 0.1075,
-  "average_retries": 0.1089,
-  "avg_latency_s": 2.2422,
+  "overall_pass_rate": 0.3366,
+  "exec_success_rate": 0.9109,
+  "exact_result_accuracy": 0.2903,
+  "average_retries": 0.1287,
+  "avg_latency_s": 2.6233,
   "blocked_case_pass_rate": 1.0,
-  "graceful_error_pass_rate": 1.0,
+  "graceful_error_pass_rate": 0.6667,
   "top_failure_reasons": [
     {
       "reason": "result_mismatch_or_success",
-      "count": 83
+      "count": 64
+    },
+    {
+      "reason": "no_such_column",
+      "count": 2
+    },
+    {
+      "reason": "unexpected_success_on_nonexistent",
+      "count": 1
     }
   ],
   "by_tier": {
     "A": {
       "total": 25,
-      "pass_rate": 0.2,
+      "pass_rate": 0.56,
       "exec_success_rate": 1.0
     },
     "B": {
       "total": 35,
-      "pass_rate": 0.1143,
-      "exec_success_rate": 1.0
+      "pass_rate": 0.2571,
+      "exec_success_rate": 0.9714
     },
     "C": {
       "total": 25,
-      "pass_rate": 0.04,
-      "exec_success_rate": 1.0
+      "pass_rate": 0.12,
+      "exec_success_rate": 0.96
     },
     "D": {
       "total": 16,
       "pass_rate": 0.5,
-      "exec_success_rate": 0.5
+      "exec_success_rate": 0.5625
     }
   },
   "by_category": {
     "aggregate": {
       "total": 10,
-      "pass_rate": 0.0
+      "pass_rate": 0.4
     },
     "ambiguous": {
       "total": 3,
@@ -65,19 +73,19 @@
     },
     "for_each_x_find_y": {
       "total": 9,
-      "pass_rate": 0.0
+      "pass_rate": 0.1111
     },
     "groupby_having": {
       "total": 8,
-      "pass_rate": 0.0
+      "pass_rate": 0.25
     },
     "join": {
       "total": 15,
-      "pass_rate": 0.0667
+      "pass_rate": 0.1333
     },
     "multi_condition": {
       "total": 4,
-      "pass_rate": 0.0
+      "pass_rate": 0.5
     },
     "multi_hop_join": {
       "total": 3,
@@ -85,11 +93,11 @@
     },
     "nested_subquery": {
       "total": 10,
-      "pass_rate": 0.1
+      "pass_rate": 0.2
     },
     "nonexistent": {
       "total": 3,
-      "pass_rate": 1.0
+      "pass_rate": 0.6667
     },
     "ratio_percent": {
       "total": 3,
@@ -101,15 +109,15 @@
     },
     "single_table": {
       "total": 10,
-      "pass_rate": 0.5
+      "pass_rate": 0.9
     },
     "synonym": {
       "total": 3,
-      "pass_rate": 0.0
+      "pass_rate": 0.3333
     },
     "topk": {
       "total": 5,
-      "pass_rate": 0.0
+      "pass_rate": 0.2
     }
   }
 }

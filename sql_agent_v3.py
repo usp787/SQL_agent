@@ -157,6 +157,7 @@ Full schema (fallback reference):
     return sql
 """
 
+
 def generate_sql(question: str, schema: str, rag_context: str = "") -> str:
     system_prompt = f"""You are an expert SQLite SQL assistant.
 
@@ -203,6 +204,7 @@ Full schema (fallback reference):
     sql = response["message"]["content"].strip()
     sql = sql.replace("```sql", "").replace("```", "").strip()
     return sql
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SQL execution (read-only connection)
