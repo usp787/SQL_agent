@@ -1,0 +1,5 @@
+# Minimal runtime deps for sql_agent_v3.py
+# Keep pins loose unless you have a known-good lockfile.
+chromadb>=0.5.0
+langgraph>=0.2.0
+ollama>=0.3.0
