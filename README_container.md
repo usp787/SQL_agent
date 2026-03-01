@@ -27,6 +27,8 @@ From this folder:
 
 ```bash
 docker build -t sql-agent:dev -f Dockerfile .
+or
+docker build --no-cache -t sql-agent:dev -f Dockerfile .
 ```
 
 ## 3) Make a data folder on host
@@ -64,13 +66,24 @@ docker run --rm -it \
 
 ```bash
 docker run --rm -it \
-  -v "$(pwd)/data:/data" \
-  -e SQL_AGENT_DB_PATH=/data/chinook.db \
-  -e SQL_AGENT_CHROMA_DIR=/data/chroma \
+  -v /d/SQL_agent:/data \
+  -e SQL_AGENT_DB_PATH=/data/Chinook_Sqlite.sqlite \
+  -e SQL_AGENT_CHROMA_DIR=/data/chroma_sql_rag \
   -e SQL_AGENT_MODEL=qwen2.5-coder:7b \
   -e OLLAMA_HOST=http://host.docker.internal:11434 \
   sql-agent:dev \
   python run_query.py --question "Top 5 customers by total spend"
+
+# For git bash path:
+MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm -it \
+  -v /d/SQL_agent:/data \
+  -e SQL_AGENT_DB_PATH=/data/Chinook_Sqlite.sqlite \
+  -e SQL_AGENT_CHROMA_DIR=/data/chroma_sql_rag \
+  -e SQL_AGENT_MODEL=qwen2.5-coder:7b \
+  -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  sql-agent:dev \
+  python run_query.py --question "Top 5 customers by total spend"
+
 ```
 
 If `host.docker.internal` doesn't resolve (rare), you can:

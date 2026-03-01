@@ -21,12 +21,12 @@ from sql_agent_v3 import build_sql_graph
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--question", required=True, help="Natural language question to answer with SQL.")
-    ap.add_argument("--max-retries", type=int, default=2, help="Max retries inside the graph (default: 2).")
+    # ap.add_argument("--max-retries", type=int, default=2, help="Max retries inside the graph (default: 2).")
     ap.add_argument("--show-rows", type=int, default=10, help="How many result rows to print (default: 10).")
     ap.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
     args = ap.parse_args()
 
-    app = build_sql_graph(max_retries=args.max_retries)
+    app = build_sql_graph()
 
     state: Dict[str, Any] = {"question": args.question}
     out: Dict[str, Any] = app.invoke(state)
