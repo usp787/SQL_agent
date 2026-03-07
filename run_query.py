@@ -34,11 +34,20 @@ def main() -> None:
     # Normalize outputs
     sql = out.get("sql", "")
     error = out.get("error", "")
-    rows = out.get("rows") or []
-    cols = out.get("cols") or []
+    # Current graph stores SQL output in `result={"columns": [...], "rows": [...]}`.
+    # Keep fallback to legacy top-level keys for compatibility.
+    result = out.get("result") or {}
+    rows = result.get("rows") or out.get("rows") or []
+    cols = result.get("columns") or out.get("cols") or []
 
     if args.json:
-        print(json.dumps({"sql": sql, "error": error, "cols": cols, "rows": rows}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {"sql": sql, "error": error, "cols": cols, "rows": rows},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return
 
     print("=== SQL ===")

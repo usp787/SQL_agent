@@ -82,7 +82,8 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm -it \
   -e SQL_AGENT_MODEL=qwen2.5-coder:7b \
   -e OLLAMA_HOST=http://host.docker.internal:11434 \
   sql-agent:dev \
-  python run_query.py --question "Top 5 customers by total spend"
+  python run_query.py --question "Top 5 customers by total spend" 
+  --json
 
 ```
 
