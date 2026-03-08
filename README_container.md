@@ -46,6 +46,9 @@ mkdir -p ./data/chroma
 
 ## 4) Run the container (recommended commands)
 
+Important: the examples below use `--rm`, so the container is **one-time only**.
+After the command finishes, Docker deletes it automatically, so you will not see it in `docker ps -a`.
+
 ### A) Linux (best): use host networking
 
 This makes `127.0.0.1:11434` inside the container refer to the host Ollama.
@@ -90,6 +93,49 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm -it \
 If `host.docker.internal` doesn't resolve (rare), you can:
 - Use your host IP (e.g., `http://192.168.x.y:11434`)
 - Or add `--add-host=host.docker.internal:host-gateway` (Docker 20.10+)
+
+## 4.1) Keep a reusable container (create/start/stop/delete)
+
+Use a named container without `--rm`:
+
+```bash
+# Create and start once (container will remain after exit)
+MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run -it --name sql-agent-dev \
+  -v /d/SQL_agent:/data \
+  -e SQL_AGENT_DB_PATH=/data/Chinook_Sqlite.sqlite \
+  -e SQL_AGENT_CHROMA_DIR=/data/chroma_sql_rag \
+  -e SQL_AGENT_MODEL=qwen2.5-coder:7b \
+  -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  sql-agent:dev \
+  python run_query.py --question "Top 5 customers by total spend"
+
+# Start existing container again
+docker start sql-agent-dev
+docker exec -it sql-agent-dev python run_query.py --question "List top 10 conservative customers"
+
+
+# Stop running container
+docker stop sql-agent-dev
+
+# Delete container
+docker rm sql-agent-dev
+
+# Force delete (if running)
+docker rm -f sql-agent-dev
+```
+
+Where to find created containers:
+
+```bash
+# Running containers
+docker ps
+
+# All containers (including stopped)
+docker ps -a
+
+# Only this project container name
+docker ps -a --filter "name=sql-agent-dev"
+```
 
 ## 5) Troubleshooting quick checks
 
