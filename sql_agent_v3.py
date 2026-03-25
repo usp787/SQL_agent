@@ -237,10 +237,20 @@ class SQLState(TypedDict):
     result:      Any
     error:       Optional[str]
     tries:       int
+    empty_retry: bool   # True after an empty-result retry has been attempted
 
 
-BLOCKED = re.compile(
+# Checks generated SQL for any blocked DML/DDL keyword.
+BLOCKED_SQL = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|PRAGMA|ATTACH|DETACH|VACUUM)\b",
+    re.IGNORECASE,
+)
+
+# Checks the user's question for actual SQL injection patterns (paired command + target).
+# Deliberately does NOT match isolated words like "delete", "drop", "update" in natural language.
+INJECTION_PATTERN = re.compile(
+    r"\b(DROP\s+TABLE|DELETE\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|ALTER\s+TABLE"
+    r"|CREATE\s+(?:TABLE|DATABASE|INDEX|VIEW)|TRUNCATE\s+TABLE)\b",
     re.IGNORECASE,
 )
 
@@ -280,11 +290,18 @@ def node_generate_sql(state: SQLState) -> SQLState:
 
 
 def node_security_check(state: SQLState) -> SQLState:
-    """Flags disallowed keywords. route_after_security will short-circuit to END."""
-    
-    if BLOCKED.search(state["sql"]) or BLOCKED.search(state["question"]):
-    #if BLOCKED.search(state["sql"]):
-        state["error"] = "Blocked: query contains a disallowed keyword."
+    """Two-tier security check.
+
+    1. Generated SQL: reject any blocked DML/DDL keyword (strict).
+    2. User question: only reject if it contains an actual SQL injection pattern
+       (e.g. "DROP TABLE …", "DELETE FROM …"), not isolated natural-language words
+       like "delete", "drop", or "update".
+    """
+    if BLOCKED_SQL.search(state["sql"]):
+        state["error"] = "Blocked: generated SQL contains a disallowed operation."
+        state["result"] = None
+    elif INJECTION_PATTERN.search(state["question"]):
+        state["error"] = "Blocked: question contains a disallowed SQL operation."
         state["result"] = None
     return state
 
@@ -295,13 +312,46 @@ def node_execute_sql(state: SQLState) -> SQLState:
         state["result"] = {"columns": cols, "rows": rows}
         state["error"] = None
     except Exception as e:
+        err_msg = str(e)
+        err_lower = err_msg.lower()
+        # Convert schema-mismatch errors into user-friendly messages so the
+        # caller gets a clear explanation instead of a raw SQLite exception.
+        if "no such table" in err_lower:
+            m = re.search(r"no such table:\s*(\S+)", err_msg, re.IGNORECASE)
+            name = m.group(1) if m else "unknown"
+            state["error"] = (
+                f"This question references a table ({name}) that does not exist "
+                "in this database. Cannot answer with the available schema."
+            )
+        elif "no such column" in err_lower:
+            m = re.search(r"no such column:\s*(\S+)", err_msg, re.IGNORECASE)
+            name = m.group(1) if m else "unknown"
+            state["error"] = (
+                f"This question references a field ({name}) that does not exist "
+                "in this database. Cannot answer with the available schema."
+            )
+        else:
+            state["error"] = err_msg
         state["result"] = None
-        state["error"] = str(e)
     return state
 
 
 def node_inc_tries(state: SQLState) -> SQLState:
     state["tries"] += 1
+    return state
+
+
+def node_handle_empty_result(state: SQLState) -> SQLState:
+    """Augment the question with empty-result guidance before the retry."""
+    state["question"] = (
+        f"{state['question']}\n\n"
+        "Note: the previous query executed without error but returned 0 rows, "
+        "which seems unexpected. Review your JOIN conditions, WHERE filters, and "
+        "string comparisons (case-sensitivity, exact vs. partial match). "
+        "Generate a corrected query."
+    )
+    state["empty_retry"] = True
+    state["error"] = None
     return state
 
 
@@ -316,11 +366,28 @@ def route_after_security(state: SQLState) -> str:
 
 
 def route_after_execute(state: SQLState) -> str:
-    if state["error"] is None:
-        return "done"
-    if state["tries"] >= MAX_TRIES:
-        return "done"
-    return "retry"
+    error = state.get("error")
+
+    if error is not None:
+        if state["tries"] >= MAX_TRIES:
+            return "done"
+        # Schema errors (missing table/column) can never be fixed by retrying —
+        # the schema won't change between attempts.
+        err_lower = error.lower()
+        if "does not exist in this database" in err_lower:
+            return "done"
+        return "retry"
+
+    # Semantic validation: if a non-aggregate query unexpectedly returns 0 rows,
+    # retry once with explicit guidance to review the query logic.
+    if not state.get("empty_retry", False):
+        rows = (state.get("result") or {}).get("rows", [])
+        sql_upper = state.get("sql", "").upper()
+        is_aggregate = any(kw in sql_upper for kw in ("COUNT(", "SUM(", "AVG(", "MIN(", "MAX("))
+        if len(rows) == 0 and not is_aggregate:
+            return "empty_retry"
+
+    return "done"
 
 
 # ── graph ────────────────────────────────────────────────────────────────────
@@ -335,6 +402,7 @@ def build_sql_graph():
     g.add_node("sec_check",    node_security_check)
     g.add_node("exec_sql",     node_execute_sql)
     g.add_node("inc_tries",    node_inc_tries)
+    g.add_node("handle_empty", node_handle_empty_result)
 
     g.add_edge(START,          "load_schema")
     g.add_edge("load_schema",  "build_rag")
@@ -342,19 +410,24 @@ def build_sql_graph():
     g.add_edge("retrieve_rag", "gen_sql")
     g.add_edge("gen_sql",      "sec_check")
 
-    # ✅ FIX: conditional branch — blocked queries never reach exec_sql
+    # Blocked queries short-circuit to END; legitimate queries reach exec_sql.
     g.add_conditional_edges(
         "sec_check",
         route_after_security,
         {"blocked": END, "execute": "exec_sql"},
     )
 
+    # Three outcomes after execution:
+    #   retry       — SQL error that may be fixable (retried via inc_tries → gen_sql)
+    #   empty_retry — success but 0 rows; retry once with guidance
+    #   done        — success, graceful schema error, or max retries reached
     g.add_conditional_edges(
         "exec_sql",
         route_after_execute,
-        {"retry": "inc_tries", "done": END},
+        {"retry": "inc_tries", "empty_retry": "handle_empty", "done": END},
     )
-    g.add_edge("inc_tries", "gen_sql")
+    g.add_edge("inc_tries",    "gen_sql")
+    g.add_edge("handle_empty", "inc_tries")
 
     return g.compile()
 
@@ -378,6 +451,7 @@ def run_sql_agent(question: str) -> SQLState:
         "result":      None,
         "error":       None,
         "tries":       0,
+        "empty_retry": False,
     }
     return app.invoke(initial_state)
 
