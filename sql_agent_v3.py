@@ -158,36 +158,42 @@ Full schema (fallback reference):
 """
 
 
-def generate_sql(question: str, schema: str, rag_context: str = "") -> str:
-    system_prompt = f"""You are an expert SQLite SQL assistant.
+def _summarise_result(cols: list[str], rows: list[tuple], max_sample: int = 3) -> str:
+    """Compact one-line summary of a query result for conversation context."""
+    if not rows:
+        return "0 rows returned"
+    sample_lines = [", ".join(str(v) for v in row) for row in rows[:max_sample]]
+    tail = f" … (+{len(rows) - max_sample} more rows)" if len(rows) > max_sample else ""
+    return f"{len(rows)} row(s) | columns: {cols} | sample: {sample_lines}{tail}"
+
+
+def generate_sql(
+    question: str,
+    schema: str,
+    rag_context: str = "",
+    history: list[dict] | None = None,
+) -> str:
+    system_prompt = f"""You are an expert SQL assistant for a SQLite database.
 
 Hard constraints:
 - Produce a SINGLE read-only query: SELECT (optionally WITH / EXPLAIN).
 - DO NOT use INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/PRAGMA/ATTACH/DETACH/VACUUM.
 - Output ONLY the SQL query — no markdown fences, no explanation.
-- ONLY use tables and columns that exist in the schema below. Never invent or assume tables/columns not listed.
+- Use ONLY the tables and columns that appear in the schema below. Never invent or assume tables/columns not listed.
 
 Column selection rules:
-- Always include the primary key column(s) of the main table(s) in your SELECT list.
-  For example: if querying Track, always include TrackId; if querying Customer, always include CustomerId.
+- Always include the primary key column(s) of the queried table(s) in your SELECT list.
 - When the question asks to "list" or "show" items, include identifying columns (IDs, names) alongside the requested data.
-- When joining tables, include the key columns that establish the relationship so results are traceable.
+- When joining tables, include the key columns that establish the join so results are traceable.
 - For aggregation queries (COUNT, SUM, AVG, etc.), use a descriptive alias for the result column.
-  For example: COUNT(*) AS track_count, SUM(Total) AS total_revenue, AVG(UnitPrice) AS avg_price.
+  Example: COUNT(*) AS record_count, SUM(amount) AS total_amount, AVG(price) AS avg_price.
 - When the question mentions "ordered by" a column, include that column in the SELECT list.
 - For GROUP BY queries, include all grouping columns in the SELECT list.
 - ROUND numeric aggregations to 2 decimal places unless the question specifies otherwise.
 
-
 Table selection rules:
-- Use ONLY the Chinook database tables: Album, Artist, Customer, Employee, Genre, Invoice, InvoiceLine, MediaType, Playlist, PlaylistTrack, Track.
-- "customers", "buyers", "clients" → Customer table
-- "invoices", "orders", "purchases", "sales", "transactions" → Invoice / InvoiceLine tables
-- "songs", "tunes", "tracks" → Track table
-- "albums", "records", "releases" → Album table
-- "artists", "bands", "performers" → Artist table
-- "employees", "staff", "reps" → Employee table
-- Do NOT use any other tables even if they appear in the schema.
+- Use ONLY the tables defined in the schema below. Do not reference any table not listed there.
+- Infer table and column names from the schema DDL; do not rely on assumptions about naming conventions.
 
 Relevant schema context (retrieved):
 {rag_context}
@@ -195,13 +201,22 @@ Relevant schema context (retrieved):
 Full schema (fallback reference):
 {schema}
 """
-    response = _ollama_client.chat(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ],
-    )
+    # Build the message list: system prompt + conversation history + current question.
+    messages: list[dict] = [{"role": "system", "content": system_prompt}]
+
+    for turn in (history or []):
+        messages.append({"role": "user", "content": turn["question"]})
+        if turn.get("sql"):
+            assistant_content = turn["sql"]
+            if turn.get("result_summary"):
+                assistant_content += f"\n-- Result: {turn['result_summary']}"
+        else:
+            assistant_content = f"-- Could not answer: {turn.get('error', 'unknown error')}"
+        messages.append({"role": "assistant", "content": assistant_content})
+
+    messages.append({"role": "user", "content": question})
+
+    response = _ollama_client.chat(model=MODEL_NAME, messages=messages)
     sql = response["message"]["content"].strip()
     sql = sql.replace("```sql", "").replace("```", "").strip()
     return sql
@@ -238,6 +253,7 @@ class SQLState(TypedDict):
     error:       Optional[str]
     tries:       int
     empty_retry: bool   # True after an empty-result retry has been attempted
+    history:     list   # Prior turns passed in from SQLSession [{question, sql, result_summary, error}]
 
 
 # Checks generated SQL for any blocked DML/DDL keyword.
@@ -284,7 +300,12 @@ def node_generate_sql(state: SQLState) -> SQLState:
             f"{q}\n\nThe previous SQL failed with this error:\n"
             f"{state['error']}\nFix the SQL."
         )
-    state["sql"] = generate_sql(q, state["schema"], rag_context=state.get("rag_context", ""))
+    state["sql"] = generate_sql(
+        q,
+        state["schema"],
+        rag_context=state.get("rag_context", ""),
+        history=state.get("history", []),
+    )
     state["error"] = None
     return state
 
@@ -441,8 +462,11 @@ app = build_sql_graph()
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_sql_agent(question: str) -> SQLState:
-    """Main entrypoint — call this from the notebook or benchmark."""
+def run_sql_agent(
+    question: str,
+    history: list[dict] | None = None,
+) -> SQLState:
+    """Main entrypoint — call this from the notebook, benchmark, or SQLSession."""
     initial_state: SQLState = {
         "question":    question,
         "schema":      "",
@@ -452,8 +476,62 @@ def run_sql_agent(question: str) -> SQLState:
         "error":       None,
         "tries":       0,
         "empty_retry": False,
+        "history":     history or [],
     }
     return app.invoke(initial_state)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Multi-turn session
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SQLSession:
+    """Stateful multi-turn session — keeps a rolling window of the last
+    MAX_HISTORY conversation rounds and passes them as context to each new query.
+
+    Usage:
+        session = SQLSession()
+        r1 = session.ask("Top 5 customers by total spend?")
+        r2 = session.ask("Which of those are from Brazil?")   # references r1 context
+        r3 = session.ask("Show their invoice dates too.")     # references r2 context
+        session.reset()  # start fresh
+    """
+
+    MAX_HISTORY: int = 3
+
+    def __init__(self) -> None:
+        self.history: list[dict] = []
+
+    def ask(self, question: str) -> SQLState:
+        """Run a question with the current conversation history as context."""
+        state = run_sql_agent(question, history=self.history)
+
+        # Build a compact summary of the result to store in history.
+        result = state.get("result")
+        if isinstance(result, dict) and result.get("rows") is not None:
+            summary = _summarise_result(
+                result.get("columns", []),
+                result.get("rows", []),
+            )
+        else:
+            summary = None
+
+        turn = {
+            "question":       question,
+            "sql":            state.get("sql", ""),
+            "result_summary": summary,
+            "error":          state.get("error"),
+        }
+        # Append and keep only the most recent MAX_HISTORY turns.
+        self.history = (self.history + [turn])[-self.MAX_HISTORY:]
+        return state
+
+    def reset(self) -> None:
+        """Clear all conversation history."""
+        self.history = []
+
+    def __repr__(self) -> str:
+        return f"SQLSession(rounds={len(self.history)}/{self.MAX_HISTORY})"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
