@@ -21,6 +21,8 @@ Docker example:
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import re
 import sqlite3
@@ -54,9 +56,9 @@ MAX_TRIES = 2
 # Ollama client — reads OLLAMA_HOST automatically.
 # Locally defaults to http://localhost:11434.
 # In Docker set OLLAMA_HOST=http://ollama:11434 to reach the sidecar.
-_ollama_client = ollama.Client(
-    host=os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-)
+_OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+_ollama_client       = ollama.Client(_OLLAMA_HOST)
+_ollama_async_client = ollama.AsyncClient(_OLLAMA_HOST)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RAG — schema indexing & retrieval
@@ -130,33 +132,6 @@ def get_database_schema(db_path: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # SQL generation
 # ─────────────────────────────────────────────────────────────────────────────
-"""
-def generate_sql(question: str, schema: str, rag_context: str = "") -> str:
-    system_prompt = fYou are an expert SQLite SQL assistant.
-
-Hard constraints:
-- Produce a SINGLE read-only query: SELECT (optionally WITH / EXPLAIN).
-- DO NOT use INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/PRAGMA/ATTACH/DETACH/VACUUM.
-- Output ONLY the SQL query — no markdown fences, no explanation.
-
-Relevant schema context (retrieved):
-{rag_context}
-
-Full schema (fallback reference):
-{schema}
-
-    response = _ollama_client.chat(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ],
-    )
-    sql = response["message"]["content"].strip()
-    sql = sql.replace("```sql", "").replace("```", "").strip()
-    return sql
-"""
-
 
 def _summarise_result(cols: list[str], rows: list[tuple], max_sample: int = 3) -> str:
     """Compact one-line summary of a query result for conversation context."""
@@ -167,18 +142,13 @@ def _summarise_result(cols: list[str], rows: list[tuple], max_sample: int = 3) -
     return f"{len(rows)} row(s) | columns: {cols} | sample: {sample_lines}{tail}"
 
 
-def generate_sql(
-    question: str,
-    schema: str,
-    rag_context: str = "",
-    history: list[dict] | None = None,
-) -> str:
-    system_prompt = f"""You are an expert SQL assistant for a SQLite database.
+def _build_system_prompt(schema: str, rag_context: str) -> str:
+    """Return the system prompt for SQL generation (shared by sync and async paths)."""
+    return f"""You are an expert SQL assistant for a SQLite database.
 
 Hard constraints:
 - Produce a SINGLE read-only query: SELECT (optionally WITH / EXPLAIN).
 - DO NOT use INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/PRAGMA/ATTACH/DETACH/VACUUM.
-- Output ONLY the SQL query — no markdown fences, no explanation.
 - Use ONLY the tables and columns that appear in the schema below. Never invent or assume tables/columns not listed.
 
 Column selection rules:
@@ -195,31 +165,80 @@ Table selection rules:
 - Use ONLY the tables defined in the schema below. Do not reference any table not listed there.
 - Infer table and column names from the schema DDL; do not rely on assumptions about naming conventions.
 
+Output format:
+- Respond with a JSON object containing a single key "sql".
+- Example: {{"sql": "SELECT col FROM tbl WHERE cond;"}}
+- Do NOT include any explanation, markdown fences, or extra keys.
+
 Relevant schema context (retrieved):
 {rag_context}
 
 Full schema (fallback reference):
 {schema}
 """
-    # Build the message list: system prompt + conversation history + current question.
-    messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
+
+def _build_messages(
+    question: str,
+    schema: str,
+    rag_context: str,
+    history: list[dict] | None,
+) -> list[dict]:
+    """Assemble the Ollama messages list: system + history turns + current question."""
+    messages: list[dict] = [{"role": "system", "content": _build_system_prompt(schema, rag_context)}]
     for turn in (history or []):
         messages.append({"role": "user", "content": turn["question"]})
         if turn.get("sql"):
-            assistant_content = turn["sql"]
+            asst = turn["sql"]
             if turn.get("result_summary"):
-                assistant_content += f"\n-- Result: {turn['result_summary']}"
+                asst += f"\n-- Result: {turn['result_summary']}"
         else:
-            assistant_content = f"-- Could not answer: {turn.get('error', 'unknown error')}"
-        messages.append({"role": "assistant", "content": assistant_content})
-
+            asst = f"-- Could not answer: {turn.get('error', 'unknown error')}"
+        messages.append({"role": "assistant", "content": asst})
     messages.append({"role": "user", "content": question})
+    return messages
 
-    response = _ollama_client.chat(model=MODEL_NAME, messages=messages)
-    sql = response["message"]["content"].strip()
-    sql = sql.replace("```sql", "").replace("```", "").strip()
-    return sql
+
+def _parse_sql_response(raw: str) -> str:
+    """Extract the SQL string from the model's JSON response.
+
+    Uses Ollama's format='json' guarantee as the primary path. Falls back to
+    markdown-fence stripping for any model that ignores the format instruction.
+    """
+    raw = raw.strip()
+    try:
+        parsed = json.loads(raw)
+        sql = parsed.get("sql", "").strip()
+        if sql:
+            return sql
+    except (json.JSONDecodeError, AttributeError):
+        pass
+    # Fallback: strip markdown fences and return the raw text.
+    return raw.replace("```sql", "").replace("```", "").strip()
+
+
+def generate_sql(
+    question: str,
+    schema: str,
+    rag_context: str = "",
+    history: list[dict] | None = None,
+) -> str:
+    """Synchronous SQL generation via Ollama."""
+    messages = _build_messages(question, schema, rag_context, history)
+    response = _ollama_client.chat(model=MODEL_NAME, messages=messages, format="json")
+    return _parse_sql_response(response["message"]["content"])
+
+
+async def async_generate_sql(
+    question: str,
+    schema: str,
+    rag_context: str = "",
+    history: list[dict] | None = None,
+) -> str:
+    """Async SQL generation — keeps the event loop unblocked during the Ollama call."""
+    messages = _build_messages(question, schema, rag_context, history)
+    response = await _ollama_async_client.chat(model=MODEL_NAME, messages=messages, format="json")
+    return _parse_sql_response(response["message"]["content"])
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SQL execution (read-only connection)
@@ -241,6 +260,54 @@ def execute_sql(db_path: str, sql: str) -> tuple[list[str], list[tuple]]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Confidence scoring
+# ─────────────────────────────────────────────────────────────────────────────
+
+def compute_confidence(state: SQLState) -> dict:
+    """Return a confidence signal for the result so callers can decide whether
+    to surface a verification prompt to the user.
+
+    Scoring factors (each deducts from a 1.0 baseline):
+      -0.4  two retries were needed
+      -0.2  one retry was needed
+      -0.15 empty-result retry was triggered
+      -0.2  result is still 0 rows on a non-aggregate query
+
+    Labels: high ≥ 0.8 · medium ≥ 0.5 · low < 0.5 · none (error / blocked)
+    """
+    error = state.get("error") or ""
+    if error:
+        return {"score": 0.0, "label": "none", "reason": error[:120]}
+
+    score = 1.0
+    reasons: list[str] = []
+
+    tries = state.get("tries", 0)
+    if tries >= 2:
+        score -= 0.4
+        reasons.append("required 2 retries")
+    elif tries == 1:
+        score -= 0.2
+        reasons.append("required 1 retry")
+
+    if state.get("empty_retry", False):
+        score -= 0.15
+        reasons.append("initially returned 0 rows")
+
+    result = state.get("result") or {}
+    rows = result.get("rows", [])
+    sql_upper = state.get("sql", "").upper()
+    is_aggregate = any(kw in sql_upper for kw in ("COUNT(", "SUM(", "AVG(", "MIN(", "MAX("))
+    if len(rows) == 0 and not is_aggregate:
+        score -= 0.2
+        reasons.append("result is empty")
+
+    score = round(max(0.0, min(1.0, score)), 2)
+    label = "high" if score >= 0.8 else ("medium" if score >= 0.5 else "low")
+    return {"score": score, "label": label, "reason": "; ".join(reasons) or "ok"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # LangGraph agent
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -254,6 +321,7 @@ class SQLState(TypedDict):
     tries:       int
     empty_retry: bool   # True after an empty-result retry has been attempted
     history:     list   # Prior turns passed in from SQLSession [{question, sql, result_summary, error}]
+    confidence:  dict   # {"score": float 0-1, "label": "high"|"medium"|"low"|"none", "reason": str}
 
 
 # Checks generated SQL for any blocked DML/DDL keyword.
@@ -293,15 +361,29 @@ def node_retrieve_rag(state: SQLState) -> SQLState:
     return state
 
 
-def node_generate_sql(state: SQLState) -> SQLState:
+def _augment_question_with_error(state: SQLState) -> str:
+    """Return the question, optionally extended with the last SQL error."""
     q = state["question"]
     if state.get("error"):
-        q = (
-            f"{q}\n\nThe previous SQL failed with this error:\n"
-            f"{state['error']}\nFix the SQL."
-        )
+        q = f"{q}\n\nThe previous SQL failed with this error:\n{state['error']}\nFix the SQL."
+    return q
+
+
+def node_generate_sql(state: SQLState) -> SQLState:
     state["sql"] = generate_sql(
-        q,
+        _augment_question_with_error(state),
+        state["schema"],
+        rag_context=state.get("rag_context", ""),
+        history=state.get("history", []),
+    )
+    state["error"] = None
+    return state
+
+
+async def async_node_generate_sql(state: SQLState) -> SQLState:
+    """Async variant — awaits the Ollama call so concurrent requests don't block."""
+    state["sql"] = await async_generate_sql(
+        _augment_question_with_error(state),
         state["schema"],
         rag_context=state.get("rag_context", ""),
         history=state.get("history", []),
@@ -453,21 +535,48 @@ def build_sql_graph():
     return g.compile()
 
 
-# Build the graph once at import time so both the notebook and benchmark
-# share the same compiled app without rebuilding it.
-app = build_sql_graph()
+def build_async_sql_graph():
+    """Same topology as build_sql_graph but uses the async SQL-generation node.
+    All other nodes remain synchronous — LangGraph handles the mix transparently.
+    Use async_app.ainvoke() to run without blocking the event loop.
+    """
+    g = StateGraph(SQLState)
+
+    g.add_node("load_schema",  node_load_schema)
+    g.add_node("build_rag",    node_build_rag_index)
+    g.add_node("retrieve_rag", node_retrieve_rag)
+    g.add_node("gen_sql",      async_node_generate_sql)   # ← async
+    g.add_node("sec_check",    node_security_check)
+    g.add_node("exec_sql",     node_execute_sql)
+    g.add_node("inc_tries",    node_inc_tries)
+    g.add_node("handle_empty", node_handle_empty_result)
+
+    g.add_edge(START,          "load_schema")
+    g.add_edge("load_schema",  "build_rag")
+    g.add_edge("build_rag",    "retrieve_rag")
+    g.add_edge("retrieve_rag", "gen_sql")
+    g.add_edge("gen_sql",      "sec_check")
+    g.add_conditional_edges("sec_check",  route_after_security,
+                            {"blocked": END, "execute": "exec_sql"})
+    g.add_conditional_edges("exec_sql",   route_after_execute,
+                            {"retry": "inc_tries", "empty_retry": "handle_empty", "done": END})
+    g.add_edge("inc_tries",    "gen_sql")
+    g.add_edge("handle_empty", "inc_tries")
+
+    return g.compile()
+
+
+# Build both graphs once at import time.
+app       = build_sql_graph()
+async_app = build_async_sql_graph()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_sql_agent(
-    question: str,
-    history: list[dict] | None = None,
-) -> SQLState:
-    """Main entrypoint — call this from the notebook, benchmark, or SQLSession."""
-    initial_state: SQLState = {
+def _initial_state(question: str, history: list[dict] | None) -> SQLState:
+    return {
         "question":    question,
         "schema":      "",
         "rag_context": "",
@@ -477,8 +586,30 @@ def run_sql_agent(
         "tries":       0,
         "empty_retry": False,
         "history":     history or [],
+        "confidence":  {},
     }
-    return app.invoke(initial_state)
+
+
+def run_sql_agent(
+    question: str,
+    history: list[dict] | None = None,
+) -> SQLState:
+    """Synchronous entrypoint — call from the notebook, benchmark, or SQLSession."""
+    state = app.invoke(_initial_state(question, history))
+    state["confidence"] = compute_confidence(state)
+    return state
+
+
+async def run_sql_agent_async(
+    question: str,
+    history: list[dict] | None = None,
+) -> SQLState:
+    """Async entrypoint — use in async frameworks (FastAPI, aiohttp, Jupyter async).
+    Multiple concurrent calls will not block each other during the Ollama HTTP call.
+    """
+    state = await async_app.ainvoke(_initial_state(question, history))
+    state["confidence"] = compute_confidence(state)
+    return state
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -505,26 +636,29 @@ class SQLSession:
     def ask(self, question: str) -> SQLState:
         """Run a question with the current conversation history as context."""
         state = run_sql_agent(question, history=self.history)
+        self._record_turn(question, state)
+        return state
 
-        # Build a compact summary of the result to store in history.
+    async def ask_async(self, question: str) -> SQLState:
+        """Async variant of ask() — suitable for FastAPI / async Jupyter cells."""
+        state = await run_sql_agent_async(question, history=self.history)
+        self._record_turn(question, state)
+        return state
+
+    def _record_turn(self, question: str, state: SQLState) -> None:
         result = state.get("result")
-        if isinstance(result, dict) and result.get("rows") is not None:
-            summary = _summarise_result(
-                result.get("columns", []),
-                result.get("rows", []),
-            )
-        else:
-            summary = None
-
+        summary = (
+            _summarise_result(result.get("columns", []), result.get("rows", []))
+            if isinstance(result, dict) and result.get("rows") is not None
+            else None
+        )
         turn = {
             "question":       question,
             "sql":            state.get("sql", ""),
             "result_summary": summary,
             "error":          state.get("error"),
         }
-        # Append and keep only the most recent MAX_HISTORY turns.
         self.history = (self.history + [turn])[-self.MAX_HISTORY:]
-        return state
 
     def reset(self) -> None:
         """Clear all conversation history."""
